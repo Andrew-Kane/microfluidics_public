@@ -18,17 +18,12 @@ from scipy.ndimage.morphology import distance_transform_edt
 
 class SegmentObj:
     """ Segmentation data from a DeepCell segmentation image.
-<<<<<<< HEAD
+    
     Requires a Z-stack of DeepCell segmented images, with each stack
         as one timepoint in a timecourse. Mother yeast cells must be
         centered in the catcher and the largest volume in order to 
         accurately segment only the mother cell
-=======
-    
-    Requires a Z-stack tiff with each slice one time point in a time
-    course. For best results, mother cells must be centered in the 
-    catcher for the entire time course and must be the largest cell.
->>>>>>> 8dbb34f83ba8550484e69f6258c183002dcb1729
+
 
     Attributes:
         filename (str): the filename for the original segmentation 
@@ -399,7 +394,6 @@ class Segmenter:
         raw_img = io.imread(self.filename)
         default_shape = raw_img.shape
         print('raw image imported.')
-<<<<<<< HEAD
         # next step's gaussian filter
         print('performing gaussian filtering...')
         gaussian_img = np.zeros(shape=default_shape,dtype='float32')
@@ -408,9 +402,7 @@ class Segmenter:
             gaussian_img[i] =gaussian_filter(input=raw_img[i], sigma=(2, 2))
         print('cytosolic image smoothed.')
         print('preprocessing complete.')
-=======
         # next step's gaussian filter assumes 60x objective
->>>>>>> 8a767735361d816ee08f0db34c1891c3335f6be3
         # BINARY THRESHOLDING AND IMAGE CLEANUP
         print('thresholding...')
         threshold_img = np.copy(gaussian_img)
@@ -425,10 +417,7 @@ class Segmenter:
         print('2d holes filled.')
         print('binary processing complete.')
         # DISTANCE AND MAXIMA TRANFORMATIONS TO FIND CELLS
-<<<<<<< HEAD
-=======
         # next two steps assume 60x objective
->>>>>>> 8a767735361d816ee08f0db34c1891c3335f6be3
         print('generating distance map...')
         dist_map = np.zeros(shape=default_shape,dtype='float32')
         #Goes through each time course separately and distance map.
@@ -488,13 +477,10 @@ class Segmenter:
             cell_nums[k]=cell_num[k][np.nonzero(cell_num[k])]
         #Deletes any artifacts that have a volume of 0.
         for vol in range(len(volumes)):
-<<<<<<< HEAD
             if 0 in volumes[vol]:
                 del volumes[vol][0]
-=======
             del volumes[vol][0]
         #Determines the distance from center in order to determine which cell is the mother.
->>>>>>> 8a767735361d816ee08f0db34c1891c3335f6be3
         print('determining distances...')
         distances = self.avg_distance_from_center(clean_cells)
         print('distances determined.')
@@ -629,23 +615,12 @@ class Segmenter:
             return new_img
     
     def avg_distance_from_center(self, shape_array):
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
         
         '''Determines the centerpoint of the mother catcher in cropped images
         and the distance to the point from the center of each segmented cell.
         It then creates a dictionary assigning each cell number to its distance.'''
         
->>>>>>> 8dbb34f83ba8550484e69f6258c183002dcb1729
         center_point = center_point =(shape_array.shape[1]/2.+15,shape_array.shape[2]/2.)
-=======
-        '''Takes the center distance of a catcher image and determines the distance
-        each cell object's center is from this point. It then returns the distances
-        assigned to each cell object.'''
-        
-        center_point = center_point =(shape_array.shape[1]/2.,shape_array.shape[2]/2.)
->>>>>>> 8a767735361d816ee08f0db34c1891c3335f6be3
         dists=[[] for f in range(shape_array.shape[0])]
         for frame in range(shape_array.shape[0]):
             cellnums = np.unique(shape_array[frame]).tolist()

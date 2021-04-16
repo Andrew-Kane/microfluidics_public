@@ -18,6 +18,10 @@ from scipy.ndimage.morphology import distance_transform_edt
 
 class SegmentObj:
     """ Segmentation data from a DeepCell segmentation image.
+    
+    Requires a Z-stack tiff with each slice one time point in a time
+    course. For best results, mother cells must be centered in the 
+    catcher for the entire time course and must be the largest cell.
 
     Attributes:
         filename (str): the filename for the original segmentation 
@@ -596,6 +600,11 @@ class Segmenter:
             return new_img
     
     def avg_distance_from_center(self, shape_array):
+        
+        '''Determines the centerpoint of the mother catcher in cropped images
+        and the distance to the point from the center of each segmented cell.
+        It then creates a dictionary assigning each cell number to its distance.'''
+        
         center_point = center_point =(shape_array.shape[1]/2.+15,shape_array.shape[2]/2.)
         dists=[[] for f in range(shape_array.shape[0])]
         for frame in range(shape_array.shape[0]):

@@ -18,6 +18,10 @@ from scipy.ndimage.morphology import distance_transform_edt
 
 class SegmentObj:
     """ Segmentation data from a DeepCell segmentation image.
+    Requires a Z-stack of DeepCell segmented images, with each stack
+        as one timepoint in a timecourse. Mother yeast cells must be
+        centered in the catcher and the largest volume in order to 
+        accurately segment only the mother cell
 
     Attributes:
         filename (str): the filename for the original segmentation 
@@ -388,6 +392,7 @@ class Segmenter:
         raw_img = io.imread(self.filename)
         default_shape = raw_img.shape
         print('raw image imported.')
+<<<<<<< HEAD
         # next step's gaussian filter
         print('performing gaussian filtering...')
         gaussian_img = np.zeros(shape=default_shape,dtype='float32')
@@ -396,6 +401,9 @@ class Segmenter:
             gaussian_img[i] =gaussian_filter(input=raw_img[i], sigma=(2, 2))
         print('cytosolic image smoothed.')
         print('preprocessing complete.')
+=======
+        # next step's gaussian filter assumes 60x objective
+>>>>>>> 8a767735361d816ee08f0db34c1891c3335f6be3
         # BINARY THRESHOLDING AND IMAGE CLEANUP
         print('thresholding...')
         threshold_img = np.copy(gaussian_img)
@@ -403,20 +411,27 @@ class Segmenter:
         threshold_img[threshold_img > 0] = 1
         print('filling holes...')
         filled_img = np.zeros(shape=default_shape,dtype='float32')
+        #Goes through each time course separately and creates a filled image.
         for i in range(default_shape[0]):
             temp_img = np.copy(threshold_img[i])
             filled_img[i] = binary_fill_holes(temp_img)
         print('2d holes filled.')
         print('binary processing complete.')
         # DISTANCE AND MAXIMA TRANFORMATIONS TO FIND CELLS
+<<<<<<< HEAD
+=======
+        # next two steps assume 60x objective
+>>>>>>> 8a767735361d816ee08f0db34c1891c3335f6be3
         print('generating distance map...')
         dist_map = np.zeros(shape=default_shape,dtype='float32')
+        #Goes through each time course separately and distance map.
         for i in range(default_shape[0]):
             temp_img = np.copy(filled_img[i])
             dist_map[i] = distance_transform_edt(temp_img, sampling=(1, 1))
         print('distance map complete.')
         print('smoothing distance map...')
         smooth_dist = np.zeros(shape=default_shape,dtype='float32')
+        #Goes through each timecourse separately and creates a smoothed distance map.
         for i in range(default_shape[0]):
             temp_img = np.copy(dist_map[i])
             smooth_dist[i] = gaussian_filter(temp_img, [4, 4])
@@ -452,6 +467,7 @@ class Segmenter:
         print('time elapsed: ' + str(runningtime) + ' seconds')
         cell_num=[[] for f in range(default_shape[0])]
         volume=[[] for f in range(default_shape[0])]
+        #Assigns a cell number and volume for each segmented cell in the timecourse.
         for i in range(default_shape[0]):
             cell_num[i], volume[i] = np.unique(clean_cells[i], return_counts=True)
         for j in range(default_shape[0]):
@@ -459,16 +475,24 @@ class Segmenter:
             volume[j] = volume[j].astype('uint16')
         cell_nums=[[] for f in range(default_shape[0])]
         volumes=[[] for f in range(default_shape[0])]
+        #Creates a dictionary to match cell number to its volume as determined by 2D number of pixels.
         for k in range(default_shape[0]):
             volumes[k] = dict(zip(cell_num[k], volume[k]))
             cell_nums[k]=cell_num[k][np.nonzero(cell_num[k])]
+        #Deletes any artifacts that have a volume of 0.
         for vol in range(len(volumes)):
+<<<<<<< HEAD
             if 0 in volumes[vol]:
                 del volumes[vol][0]
+=======
+            del volumes[vol][0]
+        #Determines the distance from center in order to determine which cell is the mother.
+>>>>>>> 8a767735361d816ee08f0db34c1891c3335f6be3
         print('determining distances...')
         distances = self.avg_distance_from_center(clean_cells)
         print('distances determined.')
         mother = [[] for f in range(default_shape[0])]
+        #Determines which cell is the mother basedo n the smallest distance and determines if that cell has the largest volume.
         for j in range(default_shape[0]):
             if volumes[j] == {} or distances[j] == {}:
                 pass
@@ -482,6 +506,7 @@ class Segmenter:
                     print(j)
         mother_cell = np.copy(clean_cells)
         print('eliminating all but mother cell...')
+        #Eliminates the masks for all cells that are not the mother and reassigns the mother's number to 1.
         for frame in range(default_shape[0]):
             mother_cell[frame] = np.copy(clean_cells[frame])
             mother_cell[frame][clean_cells[frame] != mother[frame]] = 0
@@ -489,6 +514,7 @@ class Segmenter:
         print('mothers produced.')
         mother_num = [[] for f in range(default_shape[0])]
         new_volume=[[] for f in range(default_shape[0])]
+        #Reassigns mother cells volume calculated previously.
         for i in range(default_shape[0]):
             mother_num[i], new_volume[i] = np.unique(mother_cell[i], return_counts=True)
         for j in range(default_shape[0]):
@@ -596,7 +622,15 @@ class Segmenter:
             return new_img
     
     def avg_distance_from_center(self, shape_array):
+<<<<<<< HEAD
         center_point = center_point =(shape_array.shape[1]/2.+15,shape_array.shape[2]/2.)
+=======
+        '''Takes the center distance of a catcher image and determines the distance
+        each cell object's center is from this point. It then returns the distances
+        assigned to each cell object.'''
+        
+        center_point = center_point =(shape_array.shape[1]/2.,shape_array.shape[2]/2.)
+>>>>>>> 8a767735361d816ee08f0db34c1891c3335f6be3
         dists=[[] for f in range(shape_array.shape[0])]
         for frame in range(shape_array.shape[0]):
             cellnums = np.unique(shape_array[frame]).tolist()

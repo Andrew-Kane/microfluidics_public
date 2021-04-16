@@ -388,10 +388,17 @@ class Segmenter:
         raw_img = io.imread(self.filename)
         default_shape = raw_img.shape
         print('raw image imported.')
-        # next step's gaussian filter assumes 100x obj and 0.2 um slices
+        # next step's gaussian filter
+        print('performing gaussian filtering...')
+        gaussian_img = np.zeros(shape=default_shape,dtype='float32')
+        for i in range(default_shape[0]):
+            temp_img = np.copy(raw_img[i])
+            gaussian_img[i] =gaussian_filter(input=raw_img[i], sigma=(2, 2))
+        print('cytosolic image smoothed.')
+        print('preprocessing complete.')
         # BINARY THRESHOLDING AND IMAGE CLEANUP
         print('thresholding...')
-        threshold_img = np.copy(raw_img)
+        threshold_img = np.copy(gaussian_img)
         threshold_img[threshold_img < self.threshold] = 0
         threshold_img[threshold_img > 0] = 1
         print('filling holes...')
@@ -402,7 +409,6 @@ class Segmenter:
         print('2d holes filled.')
         print('binary processing complete.')
         # DISTANCE AND MAXIMA TRANFORMATIONS TO FIND CELLS
-        # next two steps assume 100x obj and 0.2 um slices
         print('generating distance map...')
         dist_map = np.zeros(shape=default_shape,dtype='float32')
         for i in range(default_shape[0]):
@@ -457,21 +463,23 @@ class Segmenter:
             volumes[k] = dict(zip(cell_num[k], volume[k]))
             cell_nums[k]=cell_num[k][np.nonzero(cell_num[k])]
         for vol in range(len(volumes)):
-            del volumes[vol][0]
+            if 0 in volumes[vol]:
+                del volumes[vol][0]
         print('determining distances...')
         distances = self.avg_distance_from_center(clean_cells)
         print('distances determined.')
         mother = [[] for f in range(default_shape[0])]
         for j in range(default_shape[0]):
-            if volumes[j] == {}:
+            if volumes[j] == {} or distances[j] == {}:
                 pass
             else:
-                if max(volumes[j]) == min(distances[j]):
-                    mother[j] = min(volumes[j])
-                    print('maximum size and minimum distance agree')
+                if self.keywithmaxval(volumes[j]) == self.keywithminval(distances[j]):
+                    mother[j] = self.keywithminval(distances[j])
+                    print(j)
                 else:
-                    mother[j] = min(volumes[j])
+                    mother[j] = self.keywithminval(distances[j])
                     print('Maximum size does not agree with minimum distance! Mother may be incorrect, assuming min distance.')
+                    print(j)
         mother_cell = np.copy(clean_cells)
         print('eliminating all but mother cell...')
         for frame in range(default_shape[0]):
@@ -479,13 +487,13 @@ class Segmenter:
             mother_cell[frame][clean_cells[frame] != mother[frame]] = 0
             mother_cell[frame][mother_cell[frame] > 0] = 1
         print('mothers produced.')
-        mother_num = cell_num=[[] for f in range(default_shape[0])]
+        mother_num = [[] for f in range(default_shape[0])]
         new_volume=[[] for f in range(default_shape[0])]
         for i in range(default_shape[0]):
             mother_num[i], new_volume[i] = np.unique(mother_cell[i], return_counts=True)
         for j in range(default_shape[0]):
             mother_cell[j] = mother_cell[j].astype('uint16')
-            volume[j] = volume[j].astype('uint16')
+            new_volume[j] = new_volume[j].astype('uint16')
         mother_nums=[[] for f in range(default_shape[0])]
         new_volumes=[[] for f in range(default_shape[0])]
         for k in range(default_shape[0]):
@@ -525,67 +533,70 @@ class Segmenter:
 
         #retrieve number of cells in the watershedded image
         ncells = np.unique(watershed_img_2d).size-1
-        strel = np.array(
-            [[0,0,0,1,0,0,0],
-             [0,0,1,1,1,0,0],
-             [0,1,1,1,1,1,0],
-             [1,1,1,1,1,1,1],
-             [0,1,1,1,1,1,0],
-             [0,0,1,1,1,0,0],
-             [0,0,0,1,0,0,0]])
-        old_img = watershed_img_2d
-        mask_y,mask_x = np.nonzero(old_img)
-        tester = 0
-        counter = 0
-        while tester == 0:
-            new_img = np.zeros(old_img.shape)
-            for i in range(0,len(mask_y)):
-                y = mask_y[i]
-                x = mask_x[i]
-                # shift submatrix if the pixel is too close to the edge to be
-                # centered within it
-                if y-3 < 0:
-                    y = 3
-                if y+4 >= old_img.shape[0]:
-                    y = old_img.shape[0] - 4
-                if x-3 < 0:
-                    x = 3
-                if x+4 >= old_img.shape[1]:
-                    x = old_img.shape[1]-4
-                # take a strel-sized matrix around the pixel of interest.
-                a = old_img[y-3:y+4,x-3:x+4]
-                # mask for the pixels that I'm interested in comparing to
-                svals = np.multiply(a,strel)
-                # convert this to a 1D array with zeros removed
-                cellvals = svals.flatten()[np.nonzero(
-                        svals.flatten())].astype(int)
-                # count number of pixels that correspond to each
-                # cell in proximity
-                freq = np.bincount(cellvals,minlength=ncells)
-                # find cell with most abundant pixels in vicinity
-                top_cell = np.argmax(freq)
-                # because argmax only returns the first index if there are
-                # multiple matches, I need to check for duplicates. if
-                # there are duplicates, I'm going to leave the value as the
-                # original, regardless of whether the set of most abundant
-                # pixel values contain the original pixel (likely on an
-                # edge) or not (likely on a point where three cells come
-                # together - this is far less common)
-                if np.sum(freq==freq[top_cell]) > 1:
-                    new_img[mask_y[i],mask_x[i]] = old_img[mask_y[i],mask_x[i]]
-                else:
-                    new_img[mask_y[i],mask_x[i]] = top_cell
+        if ncells == 0:
+            return watershed_img_2d
+        else:
+            strel = np.array(
+                [[0,0,0,1,0,0,0],
+                 [0,0,1,1,1,0,0],
+                 [0,1,1,1,1,1,0],
+                 [1,1,1,1,1,1,1],
+                 [0,1,1,1,1,1,0],
+                 [0,0,1,1,1,0,0],
+                 [0,0,0,1,0,0,0]])
+            old_img = watershed_img_2d
+            mask_y,mask_x = np.nonzero(old_img)
+            tester = 0
+            counter = 0
+            while tester == 0:
+                new_img = np.zeros(old_img.shape)
+                for i in range(0,len(mask_y)):
+                    y = mask_y[i]
+                    x = mask_x[i]
+                    # shift submatrix if the pixel is too close to the edge to be
+                    # centered within it
+                    if y-3 < 0:
+                        y = 3
+                    if y+4 >= old_img.shape[0]:
+                        y = old_img.shape[0] - 4
+                    if x-3 < 0:
+                        x = 3
+                    if x+4 >= old_img.shape[1]:
+                        x = old_img.shape[1]-4
+                    # take a strel-sized matrix around the pixel of interest.
+                    a = old_img[y-3:y+4,x-3:x+4]
+                    # mask for the pixels that I'm interested in comparing to
+                    svals = np.multiply(a,strel)
+                    # convert this to a 1D array with zeros removed
+                    cellvals = svals.flatten()[np.nonzero(
+                            svals.flatten())].astype(int)
+                    # count number of pixels that correspond to each
+                    # cell in proximity
+                    freq = np.bincount(cellvals,minlength=ncells)
+                    # find cell with most abundant pixels in vicinity
+                    top_cell = np.argmax(freq)
+                    # because argmax only returns the first index if there are
+                    # multiple matches, I need to check for duplicates. if
+                    # there are duplicates, I'm going to leave the value as the
+                    # original, regardless of whether the set of most abundant
+                    # pixel values contain the original pixel (likely on an
+                    # edge) or not (likely on a point where three cells come
+                    # together - this is far less common)
+                    if np.sum(freq==freq[top_cell]) > 1:
+                        new_img[mask_y[i],mask_x[i]] = old_img[mask_y[i],mask_x[i]]
+                    else:
+                        new_img[mask_y[i],mask_x[i]] = top_cell
 
-            if np.array_equal(new_img,old_img):
-                tester = 1
-            else:
-                old_img = np.copy(new_img)
-            counter += 1
-        print('    number of iterations = ' + str(counter))
-        return new_img
+                if np.array_equal(new_img,old_img):
+                    tester = 1
+                else:
+                    old_img = np.copy(new_img)
+                counter += 1
+            print('    number of iterations = ' + str(counter))
+            return new_img
     
     def avg_distance_from_center(self, shape_array):
-        center_point = center_point =(shape_array.shape[1]/2.,shape_array.shape[2]/2.)
+        center_point = center_point =(shape_array.shape[1]/2.+15,shape_array.shape[2]/2.)
         dists=[[] for f in range(shape_array.shape[0])]
         for frame in range(shape_array.shape[0]):
             cellnums = np.unique(shape_array[frame]).tolist()
@@ -605,6 +616,21 @@ class Segmenter:
             distances = dict(zip(cells,dist))
             dists[frame] = distances
         return dists
+    
+    def keywithmaxval(self, d):
+        """ a) create a list of the dict's keys and values; 
+            b) return the key with the max value"""  
+        v=list(d.values())
+        k=list(d.keys())
+        return k[v.index(max(v))]
+    
+    def keywithminval (self, d):
+        """ a) create a list of the dict's keys and values;
+            b) return the key with the min value"""
+        v=list(d.values())
+        print(v)
+        k=list(d.keys())
+        return k[v.index(min(v))]
 
 
 if __name__ == '__main__':

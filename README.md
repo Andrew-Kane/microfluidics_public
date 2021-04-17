@@ -1,7 +1,7 @@
 # microfluidics_public
 
 ### developer: Andrew Kane, Ph.D. Student, Denic Laboratory, Harvard University
-### emai l: andrew_kane[at]fas[dot]harvard[dot]edu
+### email: andrew_kane[at]fas[dot]harvard[dot]edu
 
 
 ## Purpose:
@@ -25,5 +25,4 @@ This module is intended for segmenting _Saccharomyces cerevisiae_ cells during a
 Classes and methods for identifying whole cells segmented by DeepCell in a Z-stack image, of which each slice is a time point. It does not do well when cells are not present in a single layer. See docstrings for additional details. 
 ###
 
-Readme last updated 4.16.2021
-![image](https://user-images.githubusercontent.com/29231831/115091390-596dce80-9ee5-11eb-8836-7abf21cce256.png)
+Readme last updated 4.17.2021
